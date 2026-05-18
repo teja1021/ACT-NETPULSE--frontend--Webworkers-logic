@@ -3,6 +3,7 @@ import {
   ViewChild, ElementRef, signal, computed, inject
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { DOCUMENT } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
 import { SpeedTestService } from '../../core/services/speed-test.service';
 import { LogService } from '../../core/services/log.service';
@@ -13,7 +14,6 @@ import { LogService } from '../../core/services/log.service';
   imports: [],
   template: `
 @if (offline()) {
-<!-- Full-page offline screen -->
 <div class="offline-page">
   <div class="op-card">
     <div class="op-icon">
@@ -41,7 +41,6 @@ import { LogService } from '../../core/services/log.service';
   </div>
 </div>
 } @else {
-<!-- Hero -->
 <div class="hero-banner">
   <h1>Internet <span>Speed Test</span></h1>
   <p>Real-time download, upload &amp; latency measurement against your subscribed plan</p>
@@ -49,12 +48,10 @@ import { LogService } from '../../core/services/log.service';
 
 <div class="st-layout">
 
-  <!-- LEFT CARD: Meter + metrics + steps -->
   <div class="card st-left">
 
     <div class="meter-title">DOWNLOAD SPEED</div>
 
-    <!-- Canvas Speedometer -->
     <div class="canvas-wrap">
       <canvas #meterCvs width="320" height="195"></canvas>
       <div class="speed-center">
@@ -63,7 +60,6 @@ import { LogService } from '../../core/services/log.service';
       </div>
     </div>
 
-    <!-- 3 Metric boxes -->
     <div class="metric-row">
       <div class="metric-box">
         <div class="mb-label">DOWNLOAD</div>
@@ -85,14 +81,12 @@ import { LogService } from '../../core/services/log.service';
       </div>
     </div>
 
-    <!-- Progress bar while testing -->
     @if (st().phase !== 'idle' && st().phase !== 'done') {
       <div class="prog-wrap">
         <div class="prog-bar"><div class="prog-fill" [style.width.%]="st().progress"></div></div>
       </div>
     }
 
-    <!-- START button -->
     <button class="start-btn" (click)="startTest()" [disabled]="testing()">
       @if (testing()) {
         <div class="spin-white"></div> TESTING…
@@ -102,7 +96,6 @@ import { LogService } from '../../core/services/log.service';
       }
     </button>
 
-    <!-- Steps list (shown while testing or idle) -->
     @if (st().phase !== 'done') {
       <div class="steps-list">
         @for (step of steps; track step.n) {
@@ -114,7 +107,6 @@ import { LogService } from '../../core/services/log.service';
       </div>
     }
 
-    <!-- Jitter info after test -->
     @if (st().phase === 'done' && st().jitter > 0) {
       <div class="jitter-row">
         <span class="jitter-label">Jitter</span>
@@ -125,9 +117,6 @@ import { LogService } from '../../core/services/log.service';
       </div>
     }
 
-    <!-- ═══════════════════════════════════════════════
-         SPEED SUMMARY CARD (only after test completes)
-         ═══════════════════════════════════════════════ -->
     @if (st().phase === 'done' && st().download > 0) {
       <div class="card speed-summary-card">
 
@@ -161,30 +150,25 @@ import { LogService } from '../../core/services/log.service';
 
   </div>
 
-  <!-- RIGHT COLUMN -->
   <div class="st-right">
 
-    <!-- Plan Comparison Card -->
     <div class="card plan-card">
       <div class="pc-head">
         <span class="pc-ic">📋</span>
         <h3>Plan Comparison</h3>
       </div>
 
-      <!-- Plan box with red border -->
       <div class="plan-box">
         <div class="pb-label">YOUR PLAN — {{ user()?.plan?.name?.toUpperCase() }}</div>
         <div class="pb-speed">
           <strong>{{ user()?.plan?.download }}</strong>
           <span class="pb-mbps">Mbps</span>
         </div>
-        <!-- Download bar -->
         <div class="plan-bar-row">
           <span class="pbr-label">Download</span>
           <div class="pbr-track"><div class="pbr-fill dl-fill" [style.width.%]="dlPct()"></div></div>
           <span class="pbr-pct">{{ st().download > 0 ? dlPct() + '%' : '—%' }}</span>
         </div>
-        <!-- Upload bar -->
         <div class="plan-bar-row">
           <span class="pbr-label">Upload</span>
           <div class="pbr-track"><div class="pbr-fill ul-fill" [style.width.%]="ulPct()"></div></div>
@@ -192,7 +176,6 @@ import { LogService } from '../../core/services/log.service';
         </div>
       </div>
 
-      <!-- Circular indicators -->
       <div class="circle-row">
         <div class="circ-item">
           <div class="circ-svg-wrap">
@@ -225,10 +208,6 @@ import { LogService } from '../../core/services/log.service';
       </div>
     </div>
 
-    <div>
-
-  </div>
-    <!-- Performance Rating Card -->
     <div class="card perf-card">
       <div class="pc-head">
         <span class="pc-ic">🏅</span>
@@ -236,7 +215,6 @@ import { LogService } from '../../core/services/log.service';
       </div>
 
       @if (st().phase === 'done') {
-        <!-- After test: show result -->
         <div class="perf-result" [class]="'pr-' + cat().toLowerCase()">
           <div class="pr-emoji">{{ catEmoji() }}</div>
           <div>
@@ -255,7 +233,6 @@ import { LogService } from '../../core/services/log.service';
           <div class="saved-notice">✓ Result saved to history automatically</div>
         }
       } @else {
-        <!-- Before test: awaiting state -->
         <div class="perf-awaiting">
           <div class="pa-icon">⏳</div>
           <div class="pa-title">Awaiting Test</div>
@@ -270,7 +247,6 @@ import { LogService } from '../../core/services/log.service';
       }
     </div>
 
-    <!-- ISP Info Card -->
     <div class="card isp-card">
       <div class="isp-icon">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
@@ -295,6 +271,9 @@ export class SpeedTestComponent implements AfterViewInit, OnDestroy {
   private auth = inject(AuthService);
   private svc = inject(SpeedTestService);
   private log = inject(LogService);
+  
+  // INJECT DOCUMENT FOR TAB VISIBILITY GUARD
+  private document = inject(DOCUMENT);
 
   st = toSignal(this.svc.state$, { initialValue: this.svc.state$.value });
   user = this.auth.currentUser;
@@ -313,6 +292,19 @@ export class SpeedTestComponent implements AfterViewInit, OnDestroy {
     { n: 4, label: 'Analyzing results', phase: 'done' }
   ];
 
+  // TAB VISIBILITY GUARD CONSTRUCTOR
+  constructor() {
+    this.document.addEventListener('visibilitychange', this.handleVisibilityChange);
+  }
+
+  // GUARD FUNCTION
+  private handleVisibilityChange = () => {
+    const currentPhase = this.st().phase;
+    if (this.document.hidden && currentPhase !== 'idle' && currentPhase !== 'done') {
+      alert('Speed test paused or degraded. Please keep this tab active for accurate ACT Fiber speeds.');
+    }
+  };
+
   dlPct = computed(() => Math.min(100, Math.round((this.st().download / (this.user()?.plan?.download ?? 1)) * 100)));
   ulPct = computed(() => Math.min(100, Math.round((this.st().upload / (this.user()?.plan?.upload ?? 1)) * 100)));
 
@@ -320,9 +312,7 @@ export class SpeedTestComponent implements AfterViewInit, OnDestroy {
     const p = this.dlPct();
     return p >= 90 ? 'Best' : p >= 70 ? 'Good' : p >= 50 ? 'Average' : 'Poor';
   });
-
   catEmoji = computed(() => ({ Best: '🏆', Good: '✅', Average: '⚠️', Poor: '🔴' })[this.cat()]);
-
   perfDesc = computed(() => {
     const p = this.dlPct();
     if (p >= 90) return 'Excellent! Delivering near-plan speed.';
@@ -330,7 +320,6 @@ export class SpeedTestComponent implements AfterViewInit, OnDestroy {
     if (p >= 50) return 'Average — speeds are below plan expectations.';
     return 'Below average. Consider contacting your Act\'s Network Engineer.';
   });
-
   speedGrade = computed(() => {
     const dl = this.st().download;
     if (dl >= 300) return {
@@ -384,7 +373,12 @@ export class SpeedTestComponent implements AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit() { this.draw(0); this.loop(); }
-  ngOnDestroy() { cancelAnimationFrame(this._raf); }
+  
+  ngOnDestroy() { 
+    cancelAnimationFrame(this._raf);
+    // CLEAN UP GUARD ON DESTROY
+    this.document.removeEventListener('visibilitychange', this.handleVisibilityChange); 
+  }
 
   async startTest() {
     if (this.testing()) return;
@@ -420,11 +414,11 @@ export class SpeedTestComponent implements AfterViewInit, OnDestroy {
     if (s.downloadPath === 'mlab' && s.uploadPath === 'mlab') testPath = 'mlab';
     else if (s.downloadPath === 'cdn' && s.uploadPath === 'cdn') testPath = 'cdn';
     else if (s.downloadPath !== 'backend' || s.uploadPath !== 'backend') testPath = 'mixed';
-
+    
     const serverLabel = s.server
       ? `${s.server.city || ''}${s.server.country ? ', ' + s.server.country : ''} (${s.server.machine || 'M-Lab'})`
       : '';
-
+      
     this.log.save({
       userId: u.userId,
       download: s.download,
@@ -466,25 +460,26 @@ export class SpeedTestComponent implements AfterViewInit, OnDestroy {
 
     ctx.beginPath(); ctx.arc(cx, cy, R, Math.PI, 2 * Math.PI);
     ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 20; ctx.lineCap = 'round'; ctx.stroke();
-
+    
     const zones = [
       { from: 0, to: .5, color: '#fecaca' },
       { from: .5, to: .7, color: '#fde68a' },
       { from: .7, to: .9, color: '#bbf7d0' },
       { from: .9, to: 1.0, color: '#86efac' }
     ];
+    
     zones.forEach(z => {
       ctx.beginPath();
       ctx.arc(cx, cy, R, sA + z.from * Math.PI, sA + z.to * Math.PI);
       ctx.strokeStyle = z.color; ctx.lineWidth = 16; ctx.lineCap = 'butt'; ctx.stroke();
     });
-
+    
     [{ at: .5, c: '#f59e0b' }, { at: .7, c: '#22c55e' }, { at: .9, c: '#16a34a' }].forEach(d => {
       const a = sA + d.at * Math.PI;
       ctx.beginPath(); ctx.arc(cx + Math.cos(a) * R, cy + Math.sin(a) * R, 5, 0, 2 * Math.PI);
       ctx.fillStyle = d.c; ctx.fill();
     });
-
+    
     ctx.beginPath(); ctx.arc(cx + Math.cos(sA) * R, cy + Math.sin(sA) * R, 6, 0, 2 * Math.PI);
     ctx.fillStyle = '#e2001a'; ctx.fill();
     ctx.beginPath(); ctx.arc(cx + Math.cos(2 * Math.PI) * R, cy + Math.sin(2 * Math.PI) * R, 6, 0, 2 * Math.PI);
@@ -509,8 +504,8 @@ export class SpeedTestComponent implements AfterViewInit, OnDestroy {
     ctx.lineTo(cx + Math.cos(nA) * (R - 24), cy + Math.sin(nA) * (R - 24));
     ctx.lineTo(cx + Math.cos(nA + .04) * 11, cy + Math.sin(nA + .04) * 11);
     ctx.closePath(); ctx.fillStyle = '#111827'; ctx.fill(); ctx.restore();
-
     ctx.beginPath(); ctx.arc(cx, cy, 11, 0, 2 * Math.PI); ctx.fillStyle = '#1f2937'; ctx.fill();
-    ctx.beginPath(); ctx.arc(cx, cy, 5, 0, 2 * Math.PI); ctx.fillStyle = '#fff'; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, 5, 0, 2 * Math.PI);
+    ctx.fillStyle = '#fff'; ctx.fill();
   }
 }
