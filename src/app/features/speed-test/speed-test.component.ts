@@ -351,7 +351,7 @@ export class SpeedTestComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.showToast()) {
         this.showToast.set(false);
       }
-    }, 5000);
+    }, 10000);
   }
 
   // Dismiss notification instantly if user clicks anywhere on the screen
