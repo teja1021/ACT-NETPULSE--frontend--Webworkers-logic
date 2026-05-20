@@ -1,5 +1,5 @@
 import {
-  Component, OnDestroy, AfterViewInit,
+  Component, OnDestroy, AfterViewInit, OnInit, HostListener,
   ViewChild, ElementRef, signal, computed, inject
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -41,6 +41,54 @@ import { LogService } from '../../core/services/log.service';
   </div>
 </div>
 } @else {
+
+@if (showToast()) {
+  <div (click)="$event.stopPropagation()" style="
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #ffffff;
+    color: #1f2937;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    padding: 14px 20px;
+    width: 90%;
+    max-width: 520px;
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 13.5px;
+    border: 1px solid #e5e7eb;
+    border-left: 4px solid #e2001a;
+    animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  ">
+    <span style="font-size: 18px;">✨</span>
+    <div style="flex: 1; line-height: 1.4;">
+      <strong>Hi {{ user()?.name || 'User' }}, let's test in an ideal case!</strong>
+      For the most accurate results, ensure you aren't currently running heavy background downloads or uploads.
+    </div>
+    <button (click)="showToast.set(false)" style="
+      background: none;
+      border: none;
+      color: #9ca3af;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 0 4px;
+      line-height: 1;
+    ">×</button>
+  </div>
+}
+
+<style>
+  @keyframes slideDown {
+    from { transform: translate(-50%, -20px); opacity: 0; }
+    to { transform: translate(-50%, 0); opacity: 1; }
+  }
+</style>
+
 <div class="hero-banner">
   <h1>Internet <span>Speed Test</span></h1>
   <p>Real-time download, upload &amp; latency measurement against your subscribed plan</p>
@@ -64,19 +112,19 @@ import { LogService } from '../../core/services/log.service';
       <div class="metric-box">
         <div class="mb-label">DOWNLOAD</div>
         <div class="mb-line dl-line"></div>
-        <div class="mb-val dl-val">{{ st().download > 0 ? st().download : '' }}</div>
+        <div class="mb-val dl-val">{{ st().download > 0 ? st().download : '—' }}</div>
         <div class="mb-unit">Mbps</div>
       </div>
       <div class="metric-box">
         <div class="mb-label">UPLOAD</div>
         <div class="mb-line ul-line"></div>
-        <div class="mb-val ul-val">{{ st().upload > 0 ? st().upload : '' }}</div>
+        <div class="mb-val ul-val">{{ st().upload > 0 ? st().upload : '—' }}</div>
         <div class="mb-unit">Mbps</div>
       </div>
       <div class="metric-box">
         <div class="mb-label">LATENCY</div>
         <div class="mb-line lat-line"></div>
-        <div class="mb-val lat-val">{{ st().latency > 0 ? st().latency : '' }}</div>
+        <div class="mb-val lat-val">{{ st().latency > 0 ? st().latency : '—' }}</div>
         <div class="mb-unit">ms</div>
       </div>
     </div>
@@ -266,13 +314,11 @@ import { LogService } from '../../core/services/log.service';
 }
   `,
 })
-export class SpeedTestComponent implements AfterViewInit, OnDestroy {
+export class SpeedTestComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('meterCvs') cvs!: ElementRef<HTMLCanvasElement>;
   private auth = inject(AuthService);
   private svc = inject(SpeedTestService);
   private log = inject(LogService);
-  
-  // INJECT DOCUMENT FOR TAB VISIBILITY GUARD
   private document = inject(DOCUMENT);
 
   st = toSignal(this.svc.state$, { initialValue: this.svc.state$.value });
@@ -281,6 +327,9 @@ export class SpeedTestComponent implements AfterViewInit, OnDestroy {
   autoSaved = signal(false);
   smooth = signal(0);
   offline = signal(false);
+  
+  // Controls the visibility of the "Ideal Case" notification
+  showToast = signal(true);
 
   private _raf = 0;
   private _d = 0;
@@ -292,12 +341,27 @@ export class SpeedTestComponent implements AfterViewInit, OnDestroy {
     { n: 4, label: 'Analyzing results', phase: 'done' }
   ];
 
-  // TAB VISIBILITY GUARD CONSTRUCTOR
   constructor() {
     this.document.addEventListener('visibilitychange', this.handleVisibilityChange);
   }
 
-  // GUARD FUNCTION
+  ngOnInit() {
+    // Automatically close the notification after 5 seconds
+    setTimeout(() => {
+      if (this.showToast()) {
+        this.showToast.set(false);
+      }
+    }, 5000);
+  }
+
+  // Dismiss notification instantly if user clicks anywhere on the screen
+  @HostListener('document:click')
+  onGlobalClick() {
+    if (this.showToast()) {
+      this.showToast.set(false);
+    }
+  }
+
   private handleVisibilityChange = () => {
     const currentPhase = this.st().phase;
     if (this.document.hidden && currentPhase !== 'idle' && currentPhase !== 'done') {
@@ -376,8 +440,7 @@ export class SpeedTestComponent implements AfterViewInit, OnDestroy {
   
   ngOnDestroy() { 
     cancelAnimationFrame(this._raf);
-    // CLEAN UP GUARD ON DESTROY
-    this.document.removeEventListener('visibilitychange', this.handleVisibilityChange); 
+    this.document.removeEventListener('visibilitychange', this.handleVisibilityChange);
   }
 
   async startTest() {
@@ -454,7 +517,9 @@ export class SpeedTestComponent implements AfterViewInit, OnDestroy {
     const W = cv.width, H = cv.height, cx = W / 2, cy = H - 20, R = 128;
     ctx.clearRect(0, 0, W, H);
 
-    const max = this.user()?.plan?.download ?? 300;
+    const planMax = this.user()?.plan?.download ?? 300;
+    const max = spd > planMax ? Math.ceil(spd * 1.15) : planMax;
+
     const frac = Math.min(1, spd / max);
     const sA = Math.PI, nA = sA + frac * Math.PI;
 
@@ -491,10 +556,13 @@ export class SpeedTestComponent implements AfterViewInit, OnDestroy {
       ctx.moveTo(cx + Math.cos(a) * (R - 22), cy + Math.sin(a) * (R - 22));
       ctx.lineTo(cx + Math.cos(a) * (R - (maj ? 36 : 28)), cy + Math.sin(a) * (R - (maj ? 36 : 28)));
       ctx.strokeStyle = maj ? '#9ca3af' : '#d1d5db'; ctx.lineWidth = maj ? 2 : 1; ctx.stroke();
+      
       if (maj) {
         ctx.fillStyle = '#6b7280'; ctx.font = '500 10px Inter,sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(String(Math.round(i / 10 * max)), cx + Math.cos(a) * (R - 50), cy + Math.sin(a) * (R - 50));
+        
+        const labelValue = Math.round((i / 10) * max);
+        ctx.fillText(String(labelValue), cx + Math.cos(a) * (R - 50), cy + Math.sin(a) * (R - 50));
       }
     }
 
